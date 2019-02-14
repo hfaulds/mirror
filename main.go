@@ -13,11 +13,10 @@ var rootCmd = &cobra.Command{
 }
 
 func main() {
-	viper.SetEnvPrefix("github")
 	viper.AutomaticEnv()
 
 	rootCmd.PersistentFlags().StringP("token", "t", "", "GitHub Token")
-	viper.BindPFlag("token", rootCmd.PersistentFlags().Lookup("token"))
+	viper.BindPFlag("github_token", rootCmd.PersistentFlags().Lookup("token"))
 
 	rootCmd.PersistentFlags().StringP("from", "f", "", "GitHub Repository to sync from")
 	viper.BindPFlag("from", rootCmd.PersistentFlags().Lookup("from"))

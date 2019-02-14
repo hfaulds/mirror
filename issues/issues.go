@@ -48,10 +48,11 @@ type queryResponseData struct {
 }
 
 type issueDiffer struct {
-	client *graphql.Client
-	stdout io.Writer
-	from   string
-	to     string
+	fromClient *graphql.Client
+	toClient   *graphql.Client
+	stdout     io.Writer
+	from       string
+	to         string
 }
 
 type issueDiff struct {
@@ -72,9 +73,10 @@ func Command() *cobra.Command {
 
 func syncIssues(stdout io.Writer) error {
 	ctx := context.Background()
-	client := graphql.NewClient(viper.GetString("token"))
+	fromClient := graphql.NewClient(viper.GetString("github_token"))
+	toClient := graphql.NewClient(viper.GetString("to_token"))
 
-	differ := NewDiffer(client, stdout, viper.GetString("from"), viper.GetString("to"))
+	differ := NewDiffer(fromClient, toClient, stdout, viper.GetString("from"), viper.GetString("to"))
 	diff, err := differ.Diff(ctx)
 	if err != nil {
 		return err
@@ -84,30 +86,31 @@ func syncIssues(stdout io.Writer) error {
 	//updateChangedIssues
 }
 
-func NewDiffer(client *graphql.Client, stdout io.Writer, from, to string) issueDiffer {
+func NewDiffer(fromClient, toClient *graphql.Client, stdout io.Writer, from, to string) issueDiffer {
 	return issueDiffer{
-		client: client,
-		stdout: stdout,
-		from:   from,
-		to:     to,
+		fromClient: fromClient,
+		toClient:   toClient,
+		stdout:     stdout,
+		from:       from,
+		to:         to,
 	}
 }
 
 func (d issueDiffer) Diff(ctx context.Context) (*issueDiff, error) {
 	fromOwner, fromName := parseNWO(d.from)
-	fromResp, err := d.fetchIssues(ctx, fromOwner, fromName)
+	fromResp, err := fetchIssues(ctx, d.fromClient, fromOwner, fromName)
 	if err != nil {
 		return nil, err
 	}
 
 	toOwner, toName := parseNWO(d.to)
-	toResp, err := d.fetchIssues(ctx, toOwner, toName)
+	toResp, err := fetchIssues(ctx, d.toClient, toOwner, toName)
 	if err != nil {
 		return nil, err
 	}
 
 	diff := &issueDiff{
-		client:       d.client,
+		client:       d.toClient,
 		stdout:       d.stdout,
 		mirrorRepoId: toResp.Repository.ID,
 	}
@@ -127,13 +130,13 @@ func (d issueDiffer) Diff(ctx context.Context) (*issueDiff, error) {
 	return diff, nil
 }
 
-func (d issueDiffer) fetchIssues(ctx context.Context, owner, name string) (*queryResponseData, error) {
+func fetchIssues(ctx context.Context, client *graphql.Client, owner, name string) (*queryResponseData, error) {
 	vars := map[string]interface{}{
 		"owner": owner,
 		"name":  name,
 	}
 	var data queryResponseData
-	err := d.client.Query(ctx, getIssueQuery, vars, &data)
+	err := client.Query(ctx, getIssueQuery, vars, &data)
 	if err != nil {
 		return nil, err
 	}

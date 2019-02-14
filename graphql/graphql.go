@@ -78,6 +78,10 @@ func (c *Client) makeRequest(ctx context.Context, request *graphQLRequest, respo
 	}
 	defer res.Body.Close()
 
+	if res.StatusCode != 200 {
+		return fmt.Errorf("Unexpected HTTP Response from graphql API: %d", res.StatusCode)
+	}
+
 	decoder := json.NewDecoder(res.Body)
 	if err := decoder.Decode(response); err != nil {
 		return err
