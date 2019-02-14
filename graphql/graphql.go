@@ -5,7 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
+	"path"
+	"strings"
 )
 
 const (
@@ -34,15 +37,29 @@ func (e GraphQLError) Error() string {
 }
 
 type Client struct {
+	queries    map[string]string
 	httpClient *http.Client
 	token      string
 }
 
-func NewClient(token string) *Client {
-	return &Client{token: token, httpClient: &http.Client{}}
+func NewClient(token, queriesDir string) (*Client, error) {
+	queries, err := loadQueries(queriesDir)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Client{
+		token:      token,
+		httpClient: &http.Client{},
+		queries:    queries,
+	}, nil
 }
 
-func (c *Client) Query(ctx context.Context, query string, variables map[string]interface{}, dest interface{}) error {
+func (c *Client) Query(ctx context.Context, queryName string, variables map[string]interface{}, dest interface{}) error {
+	query, ok := c.queries[queryName]
+	if !ok {
+		return fmt.Errorf("Could not find query: %s", queryName)
+	}
 	req := &graphQLRequest{Query: query, Variables: variables}
 	resp := &GraphQLResponse{Data: dest}
 	if err := c.makeRequest(ctx, req, resp); err != nil {
@@ -81,4 +98,22 @@ func (c *Client) makeRequest(ctx context.Context, request *graphQLRequest, respo
 	}
 
 	return nil
+}
+
+func loadQueries(dir string) (map[string]string, error) {
+	files, err := ioutil.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	queries := make(map[string]string)
+	for _, file := range files {
+		if strings.HasSuffix(file.Name(), ".graphql") {
+			data, err := ioutil.ReadFile(path.Join(dir, file.Name()))
+			if err != nil {
+				return nil, err
+			}
+			queries[file.Name()] = string(data)
+		}
+	}
+	return queries, nil
 }
