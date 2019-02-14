@@ -72,10 +72,7 @@ func Command() *cobra.Command {
 
 func syncIssues(stdout io.Writer) error {
 	ctx := context.Background()
-	client, err := graphql.NewClient(viper.GetString("token"), "issues")
-	if err != nil {
-		return err
-	}
+	client := graphql.NewClient(viper.GetString("token"))
 
 	differ := NewDiffer(client, stdout, viper.GetString("from"), viper.GetString("to"))
 	diff, err := differ.Diff(ctx)
@@ -136,7 +133,7 @@ func (d issueDiffer) fetchIssues(ctx context.Context, owner, name string) (*quer
 		"name":  name,
 	}
 	var data queryResponseData
-	err := d.client.Query(ctx, "get_issue.graphql", vars, &data)
+	err := d.client.Query(ctx, getIssueQuery, vars, &data)
 	if err != nil {
 		return nil, err
 	}
@@ -152,7 +149,7 @@ func (d issueDiff) OpenNewIssues(ctx context.Context) error {
 			"body":          issue.Body,
 		}
 		var mirror issueNode
-		if err := d.client.Query(ctx, "create_issue.graphql", vars, &mirror); err != nil {
+		if err := d.client.Query(ctx, createIssueMutation, vars, &mirror); err != nil {
 			return err
 		}
 		d.stdout.Write([]byte(fmt.Sprintf("Created mirror issue #%d -> #%d", issue.Number, mirror.Number)))

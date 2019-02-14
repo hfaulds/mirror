@@ -1,3 +1,6 @@
+package issues
+
+const getIssueQuery = `
 query($owner: String!, $name: String!) {
   repository(owner: $owner, name: $name) {
 		id
@@ -19,3 +22,4 @@ query($owner: String!, $name: String!) {
     }
   }
 }
+`
