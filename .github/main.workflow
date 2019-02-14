@@ -1,10 +1,13 @@
 workflow "Sync Issues" {
-  on = "issue"
-  resolves = [ "Sync Issues Action" ]
+  resolves = ["Sync Issues Action"]
+  on = "issues"
 }
 
 action "Sync Issues Action" {
-  uses = "."
+  uses = "./"
   args = "mirror issues --from hfaulds/mirror --to hfaulds/mirror-mirror"
-  secrets = ["GITHUB_TO_TOKEN"]
+  secrets = [
+    "TO_TOKEN",
+    "GITHUB_TOKEN",
+  ]
 }
