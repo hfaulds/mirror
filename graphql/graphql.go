@@ -68,6 +68,7 @@ func (c *Client) makeRequest(ctx context.Context, request *graphQLRequest, respo
 	req = req.WithContext(ctx)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Accept", "application/vnd.github.starfire-preview+json")
 	res, err := c.httpClient.Do(req)
 	if err != nil {
 		return err

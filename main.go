@@ -22,6 +22,9 @@ func main() {
 	rootCmd.PersistentFlags().StringP("from", "f", "", "GitHub Repository to sync from")
 	viper.BindPFlag("from", rootCmd.PersistentFlags().Lookup("from"))
 
+	rootCmd.PersistentFlags().StringP("to-token", "", "", "PAT for target repository")
+	viper.BindPFlag("to_token", rootCmd.PersistentFlags().Lookup("to-token"))
+
 	rootCmd.PersistentFlags().StringP("to", "", "", "GitHub Repository to sync to")
 	viper.BindPFlag("to", rootCmd.PersistentFlags().Lookup("to"))
 
