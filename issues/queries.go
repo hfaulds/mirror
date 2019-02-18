@@ -9,9 +9,12 @@ query($owner: String!, $name: String!) {
 				number
         title
         body
+				createdAt
+				url
         author {
           login
           url
+					avatarUrl
         }
         comments(first: 100) {
           nodes {
