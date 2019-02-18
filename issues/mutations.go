@@ -8,6 +8,7 @@ mutation($repository_id: ID!, $title: String!, $body: String!) {
 		body: $body,
 	}) {
 		issue {
+			id
 			number
 		}
 	}

@@ -6,8 +6,8 @@ import (
 	"io"
 	"os"
 	"strings"
-	"text/template"
 
+	"github.com/hfaulds/mirror/comments"
 	"github.com/hfaulds/mirror/graphql"
 
 	"github.com/spf13/cobra"
@@ -15,6 +15,7 @@ import (
 )
 
 type issueNode struct {
+	ID        string `json:"id"`
 	Number    int    `json:"number"`
 	Title     string `json:"title"`
 	Body      string `json:"body"`
@@ -26,32 +27,32 @@ type issueNode struct {
 		AvatarURL string `json:"avatarUrl"`
 	} `json:"author"`
 	Comments struct {
-		Nodes []struct {
-			Body string `json:"body"`
-		} `json:"nodes"`
+		Nodes []comments.CommentNode `json:"nodes"`
 	} `json:"comments"`
 }
 
+func (i issueNode) originalComment() comments.CommentNode {
+	return comments.CommentNode{
+		Body:      i.Body,
+		CreatedAt: i.CreatedAt,
+		URL:       i.URL,
+		Author:    i.Author,
+	}
+}
+
 func (i issueNode) ToMirrorIssue() (*issueNode, error) {
-	mirrorTemplate, err := template.New("Mirror Issue Template").Parse(`
-<img class="avatar rounded-1" height="44" width="44" align="left" alt="@hayden-bot" src="{{.Author.AvatarURL}}"></img>
-
-## [{{.Author.Login}}]({{.Author.URL}}) at [{{.CreatedAt}}]({{.URL}}):
-
-> {{.Body}}`)
+	originalComment, err := i.originalComment().ToMirrorComment()
 	if err != nil {
 		return nil, err
 	}
-	var body strings.Builder
-	if err = mirrorTemplate.Execute(&body, i); err != nil {
-		return nil, err
-	}
 	return &issueNode{
-		Number:   i.Number,
-		Title:    fmt.Sprintf("Mirror #%d: %s", i.Number, i.Title),
-		Body:     body.String(),
-		Author:   i.Author,
-		Comments: i.Comments,
+		Number:    i.Number,
+		Title:     fmt.Sprintf("Mirror #%d: %s", i.Number, i.Title),
+		Body:      originalComment.Body,
+		CreatedAt: i.CreatedAt,
+		URL:       i.URL,
+		Author:    i.Author,
+		Comments:  i.Comments,
 	}, nil
 }
 
@@ -165,17 +166,39 @@ func fetchIssues(ctx context.Context, client *graphql.Client, owner, name string
 
 func (d issueDiff) OpenNewIssues(ctx context.Context) error {
 	for _, issue := range d.toCreate {
-		d.stdout.Write([]byte(fmt.Sprintf("Created mirror issue for #%d", issue.Number)))
+		d.stdout.Write([]byte(fmt.Sprintf("Creating mirror issue for #%d\n", issue.Number)))
 		vars := map[string]interface{}{
 			"repository_id": d.mirrorRepoId,
 			"title":         issue.Title,
 			"body":          issue.Body,
 		}
-		var mirror issueNode
-		if err := d.client.Query(ctx, createIssueMutation, vars, &mirror); err != nil {
+
+		var result struct {
+			CreateIssue struct {
+				Issue struct {
+					ID     string `json:"id"`
+					Number int    `json:"number"`
+				} `json:"issue"`
+			} `json:"createIssue"`
+		}
+		err := d.client.Query(ctx, createIssueMutation, vars, &result)
+		if err != nil {
 			return err
 		}
-		d.stdout.Write([]byte(fmt.Sprintf("Created mirror issue #%d -> #%d", issue.Number, mirror.Number)))
+		newIssue := result.CreateIssue.Issue
+		d.stdout.Write([]byte(fmt.Sprintf("Created mirror issue #%d -> #%d\n", issue.Number, newIssue.Number)))
+		commentDiff, err := comments.NewCommentDiff(
+			d.client,
+			d.stdout,
+			newIssue.ID,
+			issue.Comments.Nodes,
+		)
+		if err != nil {
+			return err
+		}
+		if err := commentDiff.AddNewComments(ctx); err != nil {
+			return err
+		}
 	}
 	return nil
 }

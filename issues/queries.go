@@ -19,6 +19,13 @@ query($owner: String!, $name: String!) {
         comments(first: 100) {
           nodes {
             body
+            createdAt
+            url
+            author {
+            	avatarUrl
+              login
+              url
+            }
           }
         }
       }
