@@ -42,41 +42,41 @@ func (i CommentNode) ToMirrorComment() (*CommentNode, error) {
 }
 
 type CommentDiff struct {
-	client *graphql.Client
-	stdout io.Writer
+	Client *graphql.Client
+	Stdout io.Writer
 
-	mirrorIssueId string
-	toCreate      []*CommentNode
+	MirrorIssueID string
+	ToCreate      []*CommentNode
 }
 
-func NewCommentDiff(client *graphql.Client, stdout io.Writer, mirrorIssueId string, comments []CommentNode) (*CommentDiff, error) {
+func NewCommentDiff(client *graphql.Client, stdout io.Writer, mirrorIssueID string, comments []CommentNode) (*CommentDiff, error) {
 	diff := &CommentDiff{
-		client:        client,
-		stdout:        stdout,
-		mirrorIssueId: mirrorIssueId,
+		Client:        client,
+		Stdout:        stdout,
+		MirrorIssueID: mirrorIssueID,
 	}
 	for _, comment := range comments {
 		mirror, err := comment.ToMirrorComment()
 		if err != nil {
 			return nil, err
 		}
-		diff.toCreate = append(diff.toCreate, mirror)
+		diff.ToCreate = append(diff.ToCreate, mirror)
 	}
 	return diff, nil
 }
 
 func (d *CommentDiff) AddNewComments(ctx context.Context) error {
-	for _, comment := range d.toCreate {
-		d.stdout.Write([]byte("Creating mirror comment\n"))
+	for _, comment := range d.ToCreate {
+		d.Stdout.Write([]byte("Creating mirror comment\n"))
 		vars := map[string]interface{}{
-			"subject_id": d.mirrorIssueId,
+			"subject_id": d.MirrorIssueID,
 			"body":       comment.Body,
 		}
 		var result struct{}
-		if err := d.client.Query(ctx, addCommentMutation, vars, &result); err != nil {
+		if err := d.Client.Query(ctx, addCommentMutation, vars, &result); err != nil {
 			return err
 		}
-		d.stdout.Write([]byte("Created mirror comment\n"))
+		d.Stdout.Write([]byte("Created mirror comment\n"))
 	}
 	return nil
 }

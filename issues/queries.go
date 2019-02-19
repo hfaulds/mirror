@@ -3,18 +3,19 @@ package issues
 const getIssueQuery = `
 query($owner: String!, $name: String!) {
   repository(owner: $owner, name: $name) {
-		id
+    id
     issues(first: 100) {
       nodes {
-				number
+        id
+        number
         title
         body
-				createdAt
-				url
+        createdAt
+        url
         author {
           login
           url
-					avatarUrl
+          avatarUrl
         }
         comments(first: 100) {
           nodes {
@@ -22,7 +23,7 @@ query($owner: String!, $name: String!) {
             createdAt
             url
             author {
-            	avatarUrl
+              avatarUrl
               login
               url
             }
@@ -31,5 +32,13 @@ query($owner: String!, $name: String!) {
       }
     }
   }
+}
+`
+
+const getViewerLoginQuery = `
+query {
+ viewer() {
+  login
+ }
 }
 `

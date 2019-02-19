@@ -56,6 +56,16 @@ func (i issueNode) ToMirrorIssue() (*issueNode, error) {
 	}, nil
 }
 
+func (i issueNode) CommentNodesByAuthor(login string) []comments.CommentNode {
+	var comments []comments.CommentNode
+	for _, comment := range i.Comments.Nodes {
+		if comment.Author.Login == login {
+			comments = append(comments, comment)
+		}
+	}
+	return comments
+}
+
 type queryResponseData struct {
 	Repository struct {
 		ID     string `json:"id"`
@@ -65,20 +75,13 @@ type queryResponseData struct {
 	} `json:"repository"`
 }
 
-type issueDiffer struct {
-	fromClient *graphql.Client
-	toClient   *graphql.Client
-	stdout     io.Writer
-	from       string
-	to         string
-}
-
 type issueDiff struct {
 	client *graphql.Client
 	stdout io.Writer
 
-	mirrorRepoId string
-	toCreate     []*issueNode
+	mirrorRepoId  string
+	toCreate      []*issueNode
+	commentsToAdd []*comments.CommentDiff
 }
 
 func Command() *cobra.Command {
@@ -99,69 +102,12 @@ func syncIssues(stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return diff.OpenNewIssues(ctx)
+	if err := diff.OpenNewIssues(ctx); err != nil {
+		return err
+	}
+	return diff.UpdateIssuesWithNewComments(ctx)
 	//closeOldIssues
 	//updateChangedIssues
-}
-
-func NewDiffer(fromClient, toClient *graphql.Client, stdout io.Writer, from, to string) issueDiffer {
-	return issueDiffer{
-		fromClient: fromClient,
-		toClient:   toClient,
-		stdout:     stdout,
-		from:       from,
-		to:         to,
-	}
-}
-
-func (d issueDiffer) Diff(ctx context.Context) (*issueDiff, error) {
-	fromOwner, fromName := parseNWO(d.from)
-	fromResp, err := fetchIssues(ctx, d.fromClient, fromOwner, fromName)
-	if err != nil {
-		return nil, err
-	}
-
-	toOwner, toName := parseNWO(d.to)
-	toResp, err := fetchIssues(ctx, d.toClient, toOwner, toName)
-	if err != nil {
-		return nil, err
-	}
-
-	diff := &issueDiff{
-		client:       d.toClient,
-		stdout:       d.stdout,
-		mirrorRepoId: toResp.Repository.ID,
-	}
-	mirrorIssues := toResp.Repository.Issues.Nodes
-	mirrorIssuesMap := make(map[string]issueNode, len(mirrorIssues))
-	for _, issue := range mirrorIssues {
-		mirrorIssuesMap[issue.Title] = issue
-	}
-
-	for _, issue := range fromResp.Repository.Issues.Nodes {
-		mirror, err := issue.ToMirrorIssue()
-		if err != nil {
-			return nil, err
-		}
-		if _, ok := mirrorIssuesMap[mirror.Title]; !ok {
-			diff.toCreate = append(diff.toCreate, mirror)
-		}
-	}
-
-	return diff, nil
-}
-
-func fetchIssues(ctx context.Context, client *graphql.Client, owner, name string) (*queryResponseData, error) {
-	vars := map[string]interface{}{
-		"owner": owner,
-		"name":  name,
-	}
-	var data queryResponseData
-	err := client.Query(ctx, getIssueQuery, vars, &data)
-	if err != nil {
-		return nil, err
-	}
-	return &data, nil
 }
 
 func (d issueDiff) OpenNewIssues(ctx context.Context) error {
@@ -196,6 +142,15 @@ func (d issueDiff) OpenNewIssues(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
+		if err := commentDiff.AddNewComments(ctx); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (d issueDiff) UpdateIssuesWithNewComments(ctx context.Context) error {
+	for _, commentDiff := range d.commentsToAdd {
 		if err := commentDiff.AddNewComments(ctx); err != nil {
 			return err
 		}

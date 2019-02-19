@@ -3,6 +3,11 @@ workflow "Sync Issues" {
   on = "issues"
 }
 
+workflow "Sync Issue Comments" {
+  on = "issue_comment"
+  resolves = [ "Sync Issues Action" ]
+}
+
 action "Sync Issues Action" {
   uses = "./"
   args = "mirror issues --from hfaulds/mirror --to hfaulds/mirror-mirror"
